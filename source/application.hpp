@@ -16,6 +16,7 @@ private:
 	int width, height, fps;
 
 	SceneRegistry* registry;
+	Scene* scene;
 
 	Application();
 	~Application();

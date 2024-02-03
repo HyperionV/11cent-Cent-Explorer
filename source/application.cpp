@@ -5,6 +5,7 @@ Application::Application() : width(1280), height(720), fps(60), title("Cent Expl
 	SetTargetFPS(fps);
 
 	registry = SceneRegistry::instance();
+	scene = registry->scene(SceneID::MENU);
 }
 
 Application::~Application() {
@@ -18,10 +19,13 @@ Application* Application::instance() {
 }
 
 void Application::run() {
-	while(!WindowShouldClose()) {
+	while(!WindowShouldClose() && scene) {
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
+		scene->draw();
 		EndDrawing();
+		
+		scene = scene->update();
 	}
 }
 

@@ -8,7 +8,7 @@ Menu::~Menu() {
 	// ...
 }
 
-void Menu::update() {
+Scene* Menu::update() {
 	// ...
 }
 

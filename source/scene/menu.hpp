@@ -10,7 +10,7 @@ public:
 	Menu();
 	~Menu();
 
-	void update() override;
+	Scene* update() override;
 	void draw() override;
 };
 
