@@ -1,6 +1,7 @@
-#include <iostream>
-#include "raygui.h"
+#include "application.hpp"
 
 int main() {
-	std::cout << "Hello world!";
+	Application* app = Application::instance();
+	app->run();
+	return 0;
 }

@@ -34,6 +34,7 @@ file(GLOB_RECURSE source
   ${PROJECT_SOURCE_DIR}/main.cpp
   ${PROJECT_SOURCE_DIR}/source/*.cpp)
 
+  include_directories(${PROJECT_SOURCE_DIR}/source)
 include_directories(${PROJECT_SOURCE_DIR}/source/library)
 include_directories(${PROJECT_SOURCE_DIR}/source/object)
 
