@@ -6,6 +6,7 @@
 
 #include "raylib.h"
 #include "raygui.h"
+#include "scene_registry.hpp"
 
 class Application {
 private:
@@ -14,10 +15,16 @@ private:
 	std::string title;
 	int width, height, fps;
 
+	SceneRegistry* registry;
+
 	Application();
 	~Application();
 
 public:
+	Application(const Application&) = delete;
+	Application& operator=(const Application&) = delete;
+	Application(Application&&) = delete;
+
 	static Application* instance();
 	void run();
 };

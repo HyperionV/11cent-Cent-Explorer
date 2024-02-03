@@ -37,6 +37,7 @@ file(GLOB_RECURSE source
   include_directories(${PROJECT_SOURCE_DIR}/source)
 include_directories(${PROJECT_SOURCE_DIR}/source/library)
 include_directories(${PROJECT_SOURCE_DIR}/source/object)
+include_directories(${PROJECT_SOURCE_DIR}/source/scene)
 
 add_executable(${PROJECT_NAME} ${source})
 target_link_libraries(${PROJECT_NAME} raylib)

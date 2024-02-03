@@ -19,6 +19,10 @@ private:
     ~SceneRegistry();
 
 public:
+    SceneRegistry(const SceneRegistry&) = delete;
+    SceneRegistry& operator=(const SceneRegistry&) = delete;
+    SceneRegistry(SceneRegistry&&) = delete;
+
     static SceneRegistry* instance();
     Scene* scene(SceneID type);
 };

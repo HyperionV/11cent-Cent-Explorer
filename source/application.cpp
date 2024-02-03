@@ -3,6 +3,8 @@
 Application::Application() : width(1280), height(720), fps(60), title("Cent Explorer") {
 	InitWindow(width, height, title.c_str());
 	SetTargetFPS(fps);
+
+	registry = SceneRegistry::instance();
 }
 
 Application::~Application() {
