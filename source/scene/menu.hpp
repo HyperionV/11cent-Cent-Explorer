@@ -3,14 +3,16 @@
 
 #include <iostream>
 #include <string>
+#include <map>
 
 #include "raylib.h"
 #include "scene.hpp"
 #include "button.hpp"
+#include "text.hpp"
 
 class Menu : public Scene {
 private:
-	Button playButton;
+	std::map<std::string, Object*> obj;
 
 public:
 	Menu();

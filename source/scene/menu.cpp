@@ -1,13 +1,17 @@
 #include "raygui.h"
 #include "menu.hpp"
 
-Menu::Menu() : playButton((Rectangle){ 100, 100, 100, 50 }, "Play") {}
+Menu::Menu() {
+	obj["start"] = new Button((Rectangle){ 540, 500, 200, 50 }, "Start");
+	obj["title"] = new Text((Rectangle){ 540, 200, 200, 50 }, "Title");
+}
 
 Scene* Menu::update() {
-	if(playButton.clicked()) std::cout << "Play button clicked" << std::endl;
+	if(static_cast<Button*>(obj["start"])->clicked())
+		std::cout << "Start button clicked" << std::endl;
 	return this;
 }
 
 void Menu::draw() {
-	playButton.draw();
+	for(auto& object : obj) object.second->draw();
 }

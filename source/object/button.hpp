@@ -5,18 +5,14 @@
 #include <string>
 
 #include "raylib.h"
+#include "object.hpp"
 
-class Button {
+class Button : public Object {
 private:
-	Rectangle rec;
-	std::string text;
-
-	bool border;
 	bool state;
 
 public:
-	Button(Rectangle rec, const char* text, bool border = true);
-	Button(Rectangle rec, const std::string &text, bool border = true);
+	using Object::Object;
 
 	void draw();
 	bool clicked();
