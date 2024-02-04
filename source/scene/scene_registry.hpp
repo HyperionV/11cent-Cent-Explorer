@@ -27,4 +27,4 @@ public:
     Scene* scene(SceneID type);
 };
 
-#endif
+#endif // SCENE_REGISTRY_HPP_

@@ -5,20 +5,21 @@
 #include <string>
 
 #include "raylib.h"
-#include "raygui.h"
 
-// class Button {
-// private:
-// 	Rectangle rec;
-// 	std::string text;
-// 	bool clicked;
+class Button {
+private:
+	Rectangle rec;
+	std::string text;
 
-// public:
-// 	Button(Rectangle rec, const char* text);
-// 	Button(Rectangle rec, const std::string &text);
+	bool border;
+	bool state;
 
-// 	void draw();
-// 	bool isClicked();
-// };
+public:
+	Button(Rectangle rec, const char* text, bool border = true);
+	Button(Rectangle rec, const std::string &text, bool border = true);
+
+	void draw();
+	bool clicked();
+};
 
 #endif // BUTTON_HPP_

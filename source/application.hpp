@@ -1,11 +1,9 @@
-#ifndef APPLICATION_HPP
-#define APPLICATION_HPP
+#ifndef APPLICATION_HPP_
+#define APPLICATION_HPP_
 
 #include <iostream>
 #include <string>
 
-#include "raylib.h"
-#include "raygui.h"
 #include "scene_registry.hpp"
 
 class Application {
