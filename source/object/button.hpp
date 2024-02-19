@@ -5,17 +5,22 @@
 #include <string>
 
 #include "raylib.h"
-#include "object.hpp"
+#include "theme.hpp"
 
-class Button : public Object {
+#include "object.hpp"
+#include "textbox.hpp"
+
+class Button : public Textbox {
 private:
 	bool state;
+	Color focus = theme::focus;
 
 public:
-	using Object::Object;
+	using Textbox::Textbox;
 
 	void draw();
 	bool clicked();
+	bool focused();
 };
 
 #endif // BUTTON_HPP_

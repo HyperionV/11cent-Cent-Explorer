@@ -9,12 +9,10 @@
 class Object {
 protected:
 	Rectangle rec;
-	std::string text;
 
 public:
 	Object();
-	Object(Rectangle rec, const char* text);
-	Object(Rectangle rec, const std::string &text);
+	Object(Rectangle rec);
 
 	virtual void draw() = 0;
 };

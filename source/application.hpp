@@ -5,6 +5,7 @@
 #include <string>
 
 #include "scene_registry.hpp"
+#include "theme.hpp"
 
 class Application {
 private:

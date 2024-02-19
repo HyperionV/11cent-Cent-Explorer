@@ -2,9 +2,18 @@
 #include "button.hpp"
 
 void Button::draw() {
-	state = GuiButton(rec, text.c_str());
+	DrawRectangleRec(rec, focused() ? focus : color);
+	Textbox::drawText();
 }
 
 bool Button::clicked() {
-	return state;
+	if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), rec)) {
+		state = !state;
+		return true;
+	}
+	return false;
+}
+
+bool Button::focused() {
+	return CheckCollisionPointRec(GetMousePosition(), rec);
 }

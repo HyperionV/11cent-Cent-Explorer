@@ -25,7 +25,7 @@ Application* Application::instance() {
 void Application::run() {
 	while(!WindowShouldClose() && scene) {
 		BeginDrawing();
-		ClearBackground(RAYWHITE);
+		ClearBackground(theme::background);
 		scene->draw();
 		EndDrawing();
 		

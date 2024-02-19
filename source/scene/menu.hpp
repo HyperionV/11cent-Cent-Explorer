@@ -7,8 +7,10 @@
 
 #include "raylib.h"
 #include "scene.hpp"
+
+#include "box.hpp"
 #include "button.hpp"
-#include "text.hpp"
+#include "textbox.hpp"
 
 class Menu : public Scene {
 private:
@@ -16,6 +18,7 @@ private:
 
 public:
 	Menu();
+	~Menu();
 
 	Scene* update() override;
 	void draw() override;
