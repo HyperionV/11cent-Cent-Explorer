@@ -56,7 +56,10 @@ class BootSector:
         self.boot_code = data[62:510]
         self.boot_signature = data[510:512]
         self.RDET_start = self.reserved_sectors + self.fat_count * self.fat_size
-        
+    
+    def offset_from_cluster(self, cluster_idx):
+        offset = self.reserved_sectors + (self.fat_size * self.fat_count) + ((cluster_idx - 2) * self.sectors_per_cluster)
+        return offset
         
     def __str__(self):
         return f'{self.oem_name.decode("utf-8").strip()}'
@@ -211,12 +214,14 @@ class CDET:
         return f'{self.name}' 
 
 class Node:
-    def __init__(self, entry = None, isRoot = False):
+    def __init__(self, dir = None, entry = None, isRoot = False):
         self.isRoot = isRoot
         self.parent = None
         self.children = []
         self.info = entry
-
+        self.dir = dir
+    def setName(self, name):
+        self.name = name
 class FAT32:
     def __init__(self, name):
         self.name = name
@@ -228,12 +233,18 @@ class FAT32:
         self.root = Node(entry = None, isRoot = True)
 #       data_a = read_chain(cu, 5, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
 #       cdet_a = CDET(data_a)
-        
+    def offset_from_cluster(self, cluster_index):
+        reserved_sectors = self.boot_sector['Reserved Sectors']
+        size_of_fat = self.boot_sector['Sectors Per FAT'] * self.boot_sector['Bytes Per Sector']
+        num_fat_copies = self.boot_sector['No. Copies of FAT']
+        sectors_per_cluster = self.boot_sector['Sectors Per Cluster']
+        offset = reserved_sectors + (size_of_fat * num_fat_copies) + ((cluster_index - 2) * sectors_per_cluster)
+        return offset
+    
     def vis(self, start_cluster, dir, parRoot = None):
         if (parRoot == None):
             parRoot = self.root
-        # curEntry = read_chain(self.ptr, start_cluster, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
-        # curCDET = CDET(curEntry)
+
         curEntry = []
         if (parRoot == self.root):
             curEntry = self.RDET.entries
@@ -249,18 +260,26 @@ class FAT32:
                 continue
             if ((i.attr & Attribute.HIDDEN)):
                 continue
-            print('?', i.attr, ' ', i.status)
             if ((i.status == Status.DELETED) or (i.status == Status.EMPTY)):
                 continue
             curNode = Node(entry = i)
             curNode.parent = parRoot
             parRoot.children.append(curNode)
             tmpDir = dir
-            if (i.longFileName != ''):
-                tmpDir = dir + '\\' + i.longFileName
-            else:
-                curName = i.name.decode().strip()
-                tmpDir = dir + '\\' + curName
+            print('extension: ', i.extension, ' ', curNode.info.extension)
+            if (i.longFileName != ''):           
+                extension = curNode.info.extension.decode().strip()
+                if (extension != ''):
+                    extension = '.' + extension
+                curNode.setName(i.longFileName + extension)
+                tmpDir = dir + '\\' + i.longFileName + extension
+            else:   
+                extension = curNode.info.extension.decode().strip()
+                curName = i.name.decode().strip(extension).strip()
+                if (extension != ''):
+                    extension = '.' + extension
+                curNode.setName(curName + extension)
+                tmpDir = dir + '\\' + curName + extension
             if (i.attr & Attribute.DIRECTORY):
                 self.vis(i.starting_cluster, tmpDir, curNode)
     
@@ -272,11 +291,29 @@ class FAT32:
         for i in curRoot.children:
             self.get_dir_tree(start_cluster, i)
 
-    # def read_txt_file(self, txtNode):
-    #     data = read_chain
+    def read_txt_file(self, txtNode):        
+        rawData = read_chain(self.ptr, txtNode.info.starting_cluster, self.boot_sector.sectors_per_cluster, self.boot_sector.bytes_per_sector, fat, self.boot_sector.RDET_start)
+        textSize = txtNode.info.file_size
+        
+        rawData = rawData[:textSize]
+        print('content:\n\n', rawData.decode('utf-8', errors='replace'))
+    
+    def draw_dir_tree(self, curNode, depth = 0):
+        if (self.root == None):
+            self.vis(0, f'\\\\.\\{self.name}:')
+            curNode = self.root
+        if (depth == 0):
+            print(self.name + ':')
+        for child in curNode.children:
+            for i in range(depth + 1):
+                print('--', end = '')
+            print(child.name)
+            if (child.info.attr & Attribute.DIRECTORY):
+                self.draw_dir_tree(curNode = child, depth = depth + 1)
+
 
 # test boot sector
-driveLetter = 'F'
+driveLetter = 'F' 
 boot_sector = None
 with open(f'\\\\.\\{driveLetter}:', 'rb') as f:
     data = f.read(512)
@@ -344,3 +381,14 @@ for i in cdet_a.entries:
 print('FAT32\n')
 f32 = FAT32('F')
 f32.vis(0, '\\\\.\\F:')
+
+
+for i in f32.root.children:
+    for j in i.children:
+        print('child', j.info.extension, j.info.file_size)
+        if (j.info.extension.decode().strip() == "TXT"):
+            print(j.info.longFileName, ' ', j.info.name.decode().strip())
+            f32.read_txt_file(j)
+            break
+print('dir_tree\n')
+f32.draw_dir_tree(f32.root)
