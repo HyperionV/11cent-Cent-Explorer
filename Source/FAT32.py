@@ -3,6 +3,7 @@ import re
 import datetime
 # class for FAT32 entry status
 
+# function for converting byte to date
 def byteToDate(data):
     year = ((data & 0b1111111000000000) >> 9) + 1980
     month = (data & 0b0000000111100000) >> 5
@@ -13,6 +14,7 @@ def byteToDate(data):
     except:
         return datetime.date(1980, 1, 1)
 
+#function for converting byte to time
 def byteToTime(data):
     h = (data & 0b1111100000000000) >> 11
     m = (data & 0b0000011111100000) >> 5
@@ -222,6 +224,7 @@ class Node:
         self.dir = dir
     def setName(self, name):
         self.name = name
+        
 class FAT32:
     def __init__(self, name):
         self.name = name
@@ -283,7 +286,7 @@ class FAT32:
             if (i.attr & Attribute.DIRECTORY):
                 self.vis(i.starting_cluster, tmpDir, curNode)
     
-    def get_dir_tree(self, start_cluster, curRoot): # get node that has known start cluster 
+    def get_dir_tree(self, start_cluster, curRoot):
         if (not (curRoot.info.attr & Attribute.DIRECTORY)):
             return
         if (curRoot.info.starting_cluster == start_cluster):
