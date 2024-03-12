@@ -222,8 +222,11 @@ class Node:
         self.children = []
         self.info = entry
         self.dir = dir
+        self.name = ''
     def setName(self, name):
         self.name = name
+    def __str__(self):
+        return self.name
         
 class FAT32:
     def __init__(self, name):
@@ -234,6 +237,7 @@ class FAT32:
         self.ptr = open(f'\\\\.\\{self.name}:', 'rb')
         self.RDET = RDET(self.ptr, self.boot_sector.RDET_start * self.boot_sector.bytes_per_sector, self.boot_sector.bytes_per_sector)
         self.root = Node(entry = None, isRoot = True)
+        self.curNode = self.root
 #       data_a = read_chain(cu, 5, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
 #       SDET_a = SDET(data_a)
     def offset_from_cluster(self, cluster_index):
@@ -247,7 +251,6 @@ class FAT32:
     def vis(self, start_cluster, dir, parRoot = None):
         if (parRoot == None):
             parRoot = self.root
-
         curEntry = []
         if (parRoot == self.root):
             curEntry = self.RDET.entries
@@ -269,7 +272,6 @@ class FAT32:
             curNode.parent = parRoot
             parRoot.children.append(curNode)
             tmpDir = dir
-            print('extension: ', i.extension, ' ', curNode.info.extension)
             if (i.longFileName != ''):           
                 extension = curNode.info.extension.decode().strip()
                 if (extension != ''):
@@ -283,6 +285,7 @@ class FAT32:
                     extension = '.' + extension
                 curNode.setName(curName + extension)
                 tmpDir = dir + '\\' + curName + extension
+            print('file name: ', curNode.name, curNode.info.attr)
             if (i.attr & Attribute.DIRECTORY):
                 self.vis(i.starting_cluster, tmpDir, curNode)
     
@@ -294,17 +297,44 @@ class FAT32:
         for i in curRoot.children:
             self.get_dir_tree(start_cluster, i)
 
-    def read_txt_file(self, txtNode):        
+    def printFile(self, txtNode):        
         rawData = read_chain(self.ptr, txtNode.info.starting_cluster, self.boot_sector.sectors_per_cluster, self.boot_sector.bytes_per_sector, fat, self.boot_sector.RDET_start)
         textSize = txtNode.info.file_size
-        
-        rawData = rawData[:textSize]
-        print('content:\n\n', rawData.decode('utf-8', errors='replace'))
+        fileContent = rawData[:textSize]
+        fileName = txtNode.name
+        if (fileName.lower().endswith('.txt')): 
+            print(fileContent.decode('utf-8', errors = 'replace'))
+        elif (fileName.lower().endswith('.docx')):
+            print('Please use MS Word to open this file!')
+        elif (fileName.lower().endswith('.pdf')):
+            print('Please use Adobe Acrobat Reader to open this file!')
+        elif (fileName.lower().endswith('.png')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.jpg')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.jpeg')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.gif')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.mp4')):
+            print('Please use a video player to open this file!')
+        elif (fileName.lower().endswith('.mp3')):
+            print('Please use a music player to open this file!')
+        elif (fileName.lower().endswith('.cpp')):
+            print('Please use a code editor to open this file!')
+        elif (fileName.lower().endswith('.c')):
+            print('Please use a code editor to open this file!')
+        elif (fileName.lower().endswith('.java')):
+            print('Please use a code editor to open this file!')
+        else:
+            print('Please use an appropriate program to open this file!')
     
+    def get_dir_tree(self):
+        self.root = Node(entry = None, isRoot = True)
+        self.vis(0, f'\\\\.\\{self.name}:')
+        self.curNode = self.root
+
     def draw_dir_tree(self, curNode, depth = 0):
-        if (self.root == None):
-            self.vis(0, f'\\\\.\\{self.name}:')
-            curNode = self.root
         if (depth == 0):
             print(self.name + ':')
         for child in curNode.children:
@@ -314,6 +344,78 @@ class FAT32:
             if (child.info.attr & Attribute.DIRECTORY):
                 self.draw_dir_tree(curNode = child, depth = depth + 1)
 
+    # From NTFS
+    def getDir(self):
+        allDir = []
+        allDir.append(self.curNode.parent)
+        for child in self.curNode.children:
+            if (child == self.curNode):
+                continue
+            allDir.append(child)
+        return allDir
+
+    def listDir(self):
+        print('Objects in', self.curNode, ':')
+        allDir = self.getDir()
+        i = 0
+        for child in allDir:
+            i = i + 1
+            if (child == self.curNode.parent):
+                print(str(i) + '\t/..')
+                continue
+            if (child.info.attr & Attribute.DIRECTORY):
+                print(str(i) + '\t/', end = '')
+            elif (child.info.attr & Attribute.ARCHIVE):
+                print(str(i) + '\t', end = '')
+            print(child)
+    
+    def moveIntoDir(self):
+        print('Folders in', self.curNode, ':')
+        allDir = self.getDir()
+        i = 0
+        tmpMap = {}
+        for child in allDir:
+            if (child == self.curNode.parent):
+                i = i + 1
+                print(str(i) + ':\t/..')
+                tmpMap[i] = child
+                continue
+            if (child.info.attr & Attribute.DIRECTORY):
+                i = i + 1
+                print(str(i) + ':\t/', end = '')
+                print(child)
+                tmpMap[i] = child
+        print('Select folder to open: ', end = '')
+        index = int(input())
+        if (index <= 0 or index > i):
+            print('Invalid index!')
+            return
+        self.curNode = tmpMap[index]
+        print('Current working directory: ', str('/') + self.curNode.name)
+    
+    def readFile(self): # read txt
+        print('Files in', self.curNode, ':')
+        tmpMap = {}
+        allDir = self.getDir()
+        i = 0
+        for child in allDir:
+            if (child == None):
+                continue
+            if (child == self.curNode.parent):
+                continue
+            if (child == self.curNode):
+                continue
+            if (child.info.attr & Attribute.ARCHIVE):
+                i = i + 1
+                print(str(i) + ':\t', end = '')
+                print(child)
+                tmpMap[i] = child
+        print('Select file to print: ', end = '')
+        index = int(input())
+        if (index <= 0 or index > i):
+            print('Invalid index!')
+            return
+        self.printFile(tmpMap[index])
 
 # test boot sector
 driveLetter = 'F' 
@@ -383,7 +485,6 @@ for i in SDET_a.entries:
 
 print('FAT32\n')
 f32 = FAT32('F')
-f32.vis(0, '\\\\.\\F:')
 
 
 for i in f32.root.children:
@@ -393,5 +494,3 @@ for i in f32.root.children:
             print(j.info.longFileName, ' ', j.info.name.decode().strip())
             f32.read_txt_file(j)
             break
-print('dir_tree\n')
-f32.draw_dir_tree(f32.root)

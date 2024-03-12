@@ -31,21 +31,21 @@ class BPB:
         self.sector_per_track = int.from_bytes(self.data[0x18:0x1a], byteorder='little')
         self.number_of_sector = int.from_bytes(self.data[0x28:0x30], byteorder='little')
         self.MFT_start_sector = self.sector_per_cluster * int.from_bytes(self.data[0x30:0x38], byteorder='little')
-        self.MFT_reserve_start_cluster = self.sector_per_cluster * int.from_bytes(self.data[0x38:0x40], byteorder='little')
+        self.MFT_reserve_start_sector = self.sector_per_cluster * int.from_bytes(self.data[0x38:0x40], byteorder='little')
 
-class FileDir:
-    def __init__(self, name, size, createTime, modifiedTime, accessedTime, fileContent, filePermission, isFolder):
-        self.name = name
-        self.size = size
-        self.createTime = createTime
-        self.modifiedTime = modifiedTime
-        self.accessedTime = accessedTime
-        self.fileContent = fileContent
-        self.filePermission = filePermission
-        self.isFolder = isFolder
+# class FileDir:
+#     def __init__(self, name, size, createTime, modifiedTime, accessedTime, fileContent, filePermission, isFolder):
+#         self.name = name
+#         self.size = size
+#         self.createTime = createTime
+#         self.modifiedTime = modifiedTime
+#         self.accessedTime = accessedTime
+#         self.fileContent = fileContent
+#         self.filePermission = filePermission
+#         self.isFolder = isFolder
         
-    def __str__(self):
-        return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
+#     def __str__(self):
+#         return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
     
 class Entry:
     def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False, fileContent = None):
@@ -125,6 +125,7 @@ class NTFS:
             fileSize = 0
             
             flags = None
+            fileContent = ''
             while True:
                 ## Attribute header
                 # get attribute type
@@ -285,14 +286,14 @@ class NTFS:
             print('Invalid index!')
             return
         self.curNode = tmpMap[index]
-        print('Current working directory: ', str('/') + self.curNode)
+        print('Current working directory: ', str('/') + str(self.curNode))
         
     def printFile(self, txtNode):
         # Read .txt file
         fileName = txtNode.entry.name
         fileContent = txtNode.entry.fileContent
         if (fileName.lower().endswith('.txt')): 
-            print(fileContent.decode('utf-8', errors = 'replace'))
+            print(fileContent)
         elif (fileName.lower().endswith('.docx')):
             print('Please use MS Word to open this file!')
         elif (fileName.lower().endswith('.pdf')):
@@ -315,7 +316,8 @@ class NTFS:
             print('Please use a code editor to open this file!')
         elif (fileName.lower().endswith('.java')):
             print('Please use a code editor to open this file!')
-        else
+        else:
+            print('Please use an appropriate program to open this file!')
             
             
 # offset = self.BPB.MFT_start_sector * self.BPB.sector_per_cluster * self.BPB.byte_per_sector
@@ -324,10 +326,11 @@ class NTFS:
         tmpMap = {}
         allDir = self.getDir()
         print('Files in', self.curNode, ':')
+        i = 0
         for child in allDir:
             if not (child.entry.isFolder):
                 i = i + 1
-                print(str(i) + ':\t/', end = '')
+                print(str(i) + ':\t', end = '')
                 print(child)
                 tmpMap[i] = child
         print('Select file to print: ', end = '')
@@ -342,4 +345,5 @@ my_NTFS = NTFS(driveLetter)
 my_NTFS.getDirTree()
 my_NTFS.listDir()
 my_NTFS.moveIntoDir()
+my_NTFS.readFile()
 # print(convertToTime(130381390209053668))
