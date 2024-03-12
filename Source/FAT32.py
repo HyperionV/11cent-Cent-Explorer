@@ -176,7 +176,7 @@ def read_chain(pointer, starting_cluster, sectors_per_cluster, bytes_per_sector,
         data += read_sector(pointer, RDET_start + (cluster - 2) * sectors_per_cluster, sectors_per_cluster, bytes_per_sector)
     return data
 
-class CDET:
+class SDET:
     def __init__(self, data):
         self.entries = []
         self.read_entries(data)
@@ -235,7 +235,7 @@ class FAT32:
         self.RDET = RDET(self.ptr, self.boot_sector.RDET_start * self.boot_sector.bytes_per_sector, self.boot_sector.bytes_per_sector)
         self.root = Node(entry = None, isRoot = True)
 #       data_a = read_chain(cu, 5, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
-#       cdet_a = CDET(data_a)
+#       SDET_a = SDET(data_a)
     def offset_from_cluster(self, cluster_index):
         reserved_sectors = self.boot_sector['Reserved Sectors']
         size_of_fat = self.boot_sector['Sectors Per FAT'] * self.boot_sector['Bytes Per Sector']
@@ -253,7 +253,7 @@ class FAT32:
             curEntry = self.RDET.entries
         else:
             tmp = read_chain(self.ptr, start_cluster, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
-            curEntry = CDET(tmp).entries
+            curEntry = SDET(tmp).entries
         for i in curEntry:
             if (i.starting_cluster == start_cluster):
                 continue 
@@ -359,13 +359,13 @@ for i in lmao.entries:
 fat = FAT(read_sector(cu, boot_sector.reserved_sectors, boot_sector.fat_size * boot_sector.fat_count, boot_sector.bytes_per_sector)) 
     
 data_a = read_chain(cu, 5, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
-cdet_a = CDET(data_a)
+SDET_a = SDET(data_a)
 print('-' * 100)
 # print('data_a:', data_a)
 print('-' * 100)
 
 
-for i in cdet_a.entries:
+for i in SDET_a.entries:
     print('Name:', i.name)
     print('Long Name:', i.longFileName)
     print('Attr:', i.attr)

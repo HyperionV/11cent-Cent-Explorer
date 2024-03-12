@@ -10,6 +10,7 @@ def convertToTime(val):
 
     timestamp = (filetime / 10_000_000) - 11_644_473_600
     timestamp = int(timestamp)
+    timestamp += 60 * 60 * 7
     createTime = datetime.datetime.utcfromtimestamp(timestamp)
 
     return createTime
@@ -32,9 +33,40 @@ class BPB:
         self.MFT_start_sector = self.sector_per_cluster * int.from_bytes(self.data[0x30:0x38], byteorder='little')
         self.MFT_reserve_start_cluster = self.sector_per_cluster * int.from_bytes(self.data[0x38:0x40], byteorder='little')
 
+class FileDir:
+    def __init__(self, name, size, createTime, modifiedTime, accessedTime, fileContent, filePermission, isFolder):
+        self.name = name
+        self.size = size
+        self.createTime = createTime
+        self.modifiedTime = modifiedTime
+        self.accessedTime = accessedTime
+        self.fileContent = fileContent
+        self.filePermission = filePermission
+        self.isFolder = isFolder
+        
+    def __str__(self):
+        return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
+    
+class Entry:
+    def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False):
+        self.isFolder = isFolder
+        self.name = name
+        self.timeCreated = timeCreated
+        self.timeAccessed = timeAccessed
+        self.timeModified = timeModified
+        self.parDir = parDirectory
+
+class Node:
+    def __init__(self, entry = None, parent = None, address = None):
+        self.entry = entry
+        self.parent = parent
+        self.children = []
+        self.address = address
+
 class NTFS:
     def __init__(self, name):
         self.name = name
+        self.root = None
         self.ptr = open(f'\\\\.\\{self.name}:', 'rb')
         with open(f'\\\\.\\{self.name}:', 'rb') as f:
             self.BPB = BPB(self.ptr, self.name + ':')
@@ -46,7 +78,7 @@ class NTFS:
         print('number_of_sector: ', self.BPB.number_of_sector)
 
     def clusterToSectorList(self, clusterList):
-        sectorList = []
+        sectorList = [] 
         for cluster in clusterList:
             sectorList.append(cluster * self.BPB.sector_per_cluster)
         return sectorList
@@ -56,25 +88,41 @@ class NTFS:
         for sectorIndex in sectorList:
             self.ptr.seek(sectorIndex * self.BPB.byte_per_sector)
             sectorData = self.ptr.read(self.BPB.byte_per_sector)
-            sectorText = sectorData.decode('utf-8')
+            sectorText = sectorData.decode('utf-8', errors = 'replace')
             data += sectorText
         return data
 
 
     def readEntry(self):
+        self.map = {}
         self.ptr.seek(self.BPB.MFT_start_sector * self.BPB.byte_per_sector)
         for i in range(0, self.BPB.number_of_sector, 2):
-            # print('num sector: ', i, ' ', self.BPB.number_of_sector)
             data = self.ptr.read(1024) # 1024 bytes
 
             # check signature
             if (data[0:4] != b'FILE'):
                 continue
+
+            fileFlag = int.from_bytes(data[0x16:0x18], byteorder='little')
+            if not (fileFlag & 0x01):
+                continue
+            isFolder = 0
+            if (fileFlag & 0x02):
+                isFolder = 1
+            elif ((fileFlag & 0x04) or (fileFlag & 0x08)):
+                continue
+            
+            # if (fileFlag & 0x02):
+            
+            
+
             # get starting byte of attribute from header
             attrOffset = 20
             attrOffset = int.from_bytes(data[attrOffset:attrOffset + 2], byteorder='little')
 
             fileSize = 0
+            
+            flags = None
             while True:
                 ## Attribute header
                 # get attribute type
@@ -84,7 +132,6 @@ class NTFS:
                 # break if end of attribute
                 if (attrType == 0xFFFFFFFF or attrType == 0x0):
                     break
-            
                 # get attribute length
                 attrLength = int.from_bytes(data[attrOffset + 4:attrOffset + 8], byteorder='little')
 
@@ -100,10 +147,10 @@ class NTFS:
                 # get attribute's content's offset 
                 attrContentOffset = int.from_bytes(data[attrOffset + 20:attrOffset + 21], byteorder='little')
 
-
                 ## Attribute content
                 # attribute of type $FILE_NAME
-                if (attrType == Attribute.FILE_NAME.value): 
+                
+                if (attrType == Attribute.FILE_NAME.value):
                     # get file name
                     nameLength = int.from_bytes(data[attrOffset + attrContentOffset + 64:attrOffset + attrContentOffset + 65], byteorder='little')
                     # fileName = int.from_bytes(data[attrOffset + attrContentOffset + 66:attrOffset + attrContentOffset + 66 + nameLength * 2], byteorder='little')
@@ -111,7 +158,12 @@ class NTFS:
                     fileName = fileName.decode('utf-16le')
                     if (fileName.startswith('$')):
                         break
-                    
+                    # get parent directory
+                    parDir = int.from_bytes(data[attrOffset + attrContentOffset + 0:attrOffset + attrContentOffset + 6], byteorder='little')
+                    parDir = hex(parDir)
+                    # whatever this is
+                    parDir2 = int.from_bytes(data[attrOffset + attrContentOffset + 6:attrOffset + attrContentOffset + 8], byteorder='little')
+                    parDir2 = hex(parDir2)
                     # get file create time
                     createTime = int.from_bytes(data[attrOffset + attrContentOffset + 8:attrOffset + attrContentOffset + 16], byteorder='little')
                     createTime = convertToTime(createTime)
@@ -129,6 +181,7 @@ class NTFS:
                         fileSize = attrContentSize
                         fileContent = data[attrOffset + attrContentOffset:attrOffset + attrContentOffset + fileSize]
                         fileContent = fileContent.decode('utf-8', errors = 'replace')
+                        filePermission = data[attrOffset + attrContentOffset + 0x20:attrOffset + attrContentOffset + 0x2d]
                     # in case non-resident attribute
                     else:
                         dataRunOffset = int.from_bytes(data[attrOffset + 32:attrOffset + 34], byteorder='little')
@@ -142,19 +195,74 @@ class NTFS:
                             sectorList = self.clusterToSectorList(clusterList)
                             # read data based on sector list to get file data
                             fileContent = self.readSectorChain(sectorList)
-                
+                elif (attrType == Attribute.STANDARD_INFORMATION.value):
+                    # get flags
+                    flags = int.from_bytes(data[attrOffset + attrContentOffset + 0x20:attrOffset + attrContentOffset + 0x20 + 4], byteorder='little')                    
+                    # print('attr flag: ', hex(flags))
+
                 # add offset to read next attribute
                 attrOffset += attrLength
-            if (fileSize > 0):
-                print('file name: ', fileName)
-                print('file size: ', fileSize)
+            
+            
+            if (isFolder and fileName.strip() != '.'):
+                if (flags != None):
+                    if (flags & 0x02):
+                        continue
+                    if (flags & 0x04):
+                        continue
+            curEntry = None
+            if (fileName.startswith('$')):
+                continue
+            if (isFolder):
+                print('i: ', hex(i//2), i//2)
+                print('folder name: ', fileName)
+                print('dir')
+                print('parent directory: ', parDir)
                 print('time created: ', createTime)
                 print('last modified time: ', modifiedTime)
                 print('last accessed time: ', accessedTime)
-            if (fileName.lower().endswith('.txt')): 
-                print('fileContent:\n', fileContent)
-                # print(fileContent.decode('utf-8')) 
+                print('FFLAG:', flags)
+            if (fileSize > 0):
+                print(' file name: ', fileName)
+                print(' parent directory: ', parDir, ' ? ', parDir2)
+                print(' file size: ', fileSize)
+                print(' time created: ', createTime)
+                print(' last modified time: ', modifiedTime)
+                print(' last accessed time: ', accessedTime)
+            curEntry = Entry(int(parDir, 16), fileName, createTime, accessedTime, modifiedTime, isFolder)
+            
 
+            # curNode = Node(curEntry, hex(i), parDir)
+
+            print('FFFFFFFFFFFFFFFFFFFFFFFFFFFLAG: ', hex(flags))
+            if (fileName.lower().endswith('.txt')): 
+                print(' flag: ', fileFlag, not (fileFlag & 0x01))
+                # print(fileContent.decode('utf-8'))
+            print('\n')
+
+            self.map[i//2] = Node(entry = curEntry)
+        # if (curEntry.name.strip() == '.')
+
+        for key, val in self.map.items():
+            if (val.entry.parDir in self.map):
+                val.parent = self.map[val.entry.parDir]
+                self.map[val.entry.parDir].children.append(val)
+            if (val.entry.name.strip() == '.'):
+                self.root = val
+
+    
+    def getDirTree(self, curNode = None, depth = 0):
+        if (curNode == None):
+            print(self.name + ':')
+            curNode = self.root
+        for child in curNode.children:
+            if (child == curNode):
+                continue
+            for i in range(depth + 1):
+                print('--', end = '')
+            print(child.entry.name)
+            if (child.entry.isFolder):
+                self.getDirTree(curNode = child, depth = depth + 1)
 
 
 # offset = self.BPB.MFT_start_sector * self.BPB.sector_per_cluster * self.BPB.byte_per_sector
@@ -163,4 +271,5 @@ driveLetter = 'G'
 my_NTFS = NTFS(driveLetter)
 my_NTFS.get_info()
 my_NTFS.readEntry()
+my_NTFS.getDirTree()
 # print(convertToTime(130381390209053668))
