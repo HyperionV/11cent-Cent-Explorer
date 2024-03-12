@@ -48,13 +48,14 @@ class FileDir:
         return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
     
 class Entry:
-    def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False):
+    def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False, fileContent = None):
         self.isFolder = isFolder
         self.name = name
         self.timeCreated = timeCreated
         self.timeAccessed = timeAccessed
         self.timeModified = timeModified
         self.parDir = parDirectory
+        self.fileContent = fileContent
 
 class Node:
     def __init__(self, entry = None, parent = None, address = None):
@@ -62,14 +63,20 @@ class Node:
         self.parent = parent
         self.children = []
         self.address = address
+    
+    def __str__(self):
+        return self.entry.name
 
 class NTFS:
     def __init__(self, name):
         self.name = name
         self.root = None
+        self.curNode = None
+        self.map = {}
         self.ptr = open(f'\\\\.\\{self.name}:', 'rb')
         with open(f'\\\\.\\{self.name}:', 'rb') as f:
             self.BPB = BPB(self.ptr, self.name + ':')
+        self.readEntry()
     
     def get_info(self):
         print('sector_size: ', self.BPB.byte_per_sector)
@@ -94,7 +101,6 @@ class NTFS:
 
 
     def readEntry(self):
-        self.map = {}
         self.ptr.seek(self.BPB.MFT_start_sector * self.BPB.byte_per_sector)
         for i in range(0, self.BPB.number_of_sector, 2):
             data = self.ptr.read(1024) # 1024 bytes
@@ -112,10 +118,6 @@ class NTFS:
             elif ((fileFlag & 0x04) or (fileFlag & 0x08)):
                 continue
             
-            # if (fileFlag & 0x02):
-            
-            
-
             # get starting byte of attribute from header
             attrOffset = 20
             attrOffset = int.from_bytes(data[attrOffset:attrOffset + 2], byteorder='little')
@@ -149,7 +151,6 @@ class NTFS:
 
                 ## Attribute content
                 # attribute of type $FILE_NAME
-                
                 if (attrType == Attribute.FILE_NAME.value):
                     # get file name
                     nameLength = int.from_bytes(data[attrOffset + attrContentOffset + 64:attrOffset + attrContentOffset + 65], byteorder='little')
@@ -197,8 +198,7 @@ class NTFS:
                             fileContent = self.readSectorChain(sectorList)
                 elif (attrType == Attribute.STANDARD_INFORMATION.value):
                     # get flags
-                    flags = int.from_bytes(data[attrOffset + attrContentOffset + 0x20:attrOffset + attrContentOffset + 0x20 + 4], byteorder='little')                    
-                    # print('attr flag: ', hex(flags))
+                    flags = int.from_bytes(data[attrOffset + attrContentOffset + 0x20:attrOffset + attrContentOffset + 0x20 + 4], byteorder='little')                   
 
                 # add offset to read next attribute
                 attrOffset += attrLength
@@ -213,35 +213,13 @@ class NTFS:
             curEntry = None
             if (fileName.startswith('$')):
                 continue
-            if (isFolder):
-                print('i: ', hex(i//2), i//2)
-                print('folder name: ', fileName)
-                print('dir')
-                print('parent directory: ', parDir)
-                print('time created: ', createTime)
-                print('last modified time: ', modifiedTime)
-                print('last accessed time: ', accessedTime)
-                print('FFLAG:', flags)
-            if (fileSize > 0):
-                print(' file name: ', fileName)
-                print(' parent directory: ', parDir, ' ? ', parDir2)
-                print(' file size: ', fileSize)
-                print(' time created: ', createTime)
-                print(' last modified time: ', modifiedTime)
-                print(' last accessed time: ', accessedTime)
-            curEntry = Entry(int(parDir, 16), fileName, createTime, accessedTime, modifiedTime, isFolder)
+            curEntry = Entry(int(parDir, 16), fileName, createTime, accessedTime, modifiedTime, isFolder, fileContent)
             
-
-            # curNode = Node(curEntry, hex(i), parDir)
-
-            print('FFFFFFFFFFFFFFFFFFFFFFFFFFFLAG: ', hex(flags))
-            if (fileName.lower().endswith('.txt')): 
-                print(' flag: ', fileFlag, not (fileFlag & 0x01))
-                # print(fileContent.decode('utf-8'))
-            print('\n')
+            # Read .txt file
+            # if (fileName.lower().endswith('.txt')): 
+            #     print(fileContent.decode('utf-8'))
 
             self.map[i//2] = Node(entry = curEntry)
-        # if (curEntry.name.strip() == '.')
 
         for key, val in self.map.items():
             if (val.entry.parDir in self.map):
@@ -249,6 +227,7 @@ class NTFS:
                 self.map[val.entry.parDir].children.append(val)
             if (val.entry.name.strip() == '.'):
                 self.root = val
+                self.curNode = self.root
 
     
     def getDirTree(self, curNode = None, depth = 0):
@@ -263,13 +242,104 @@ class NTFS:
             print(child.entry.name)
             if (child.entry.isFolder):
                 self.getDirTree(curNode = child, depth = depth + 1)
+    
+    def getDir(self):
+        allDir = []
+        allDir.append(self.curNode.parent)
+        for child in self.curNode.children:
+            if (child == self.curNode):
+                continue
+            allDir.append(child)
+        return allDir
 
-
+    def listDir(self):
+        print('Objects in', self.curNode, ':')
+        allDir = self.getDir()
+        for child in allDir:
+            if (child == self.curNode.parent):
+                print('\t/..')
+                continue
+            if (child.entry.isFolder):
+                print('\t/', end = '')
+            print(child)
+    
+    def moveIntoDir(self):
+        print('Folders in', self.curNode, ':')
+        allDir = self.getDir()
+        i = 0
+        tmpMap = {}
+        for child in allDir:
+            if (child == self.curNode.parent):
+                i = i + 1
+                print(str(i) + ':\t/..')
+                tmpMap[i] = child
+                continue
+            if (child.entry.isFolder):
+                i = i + 1
+                print(str(i) + ':\t/', end = '')
+                print(child)
+                tmpMap[i] = child
+        print('Select folder to open: ', end = '')
+        index = int(input())
+        if (index <= 0 or index > i):
+            print('Invalid index!')
+            return
+        self.curNode = tmpMap[index]
+        print('Current working directory: ', str('/') + self.curNode)
+        
+    def printFile(self, txtNode):
+        # Read .txt file
+        fileName = txtNode.entry.name
+        fileContent = txtNode.entry.fileContent
+        if (fileName.lower().endswith('.txt')): 
+            print(fileContent.decode('utf-8', errors = 'replace'))
+        elif (fileName.lower().endswith('.docx')):
+            print('Please use MS Word to open this file!')
+        elif (fileName.lower().endswith('.pdf')):
+            print('Please use Adobe Acrobat Reader to open this file!')
+        elif (fileName.lower().endswith('.png')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.jpg')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.jpeg')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.gif')):
+            print('Please use an image viewer to open this file!')
+        elif (fileName.lower().endswith('.mp4')):
+            print('Please use a video player to open this file!')
+        elif (fileName.lower().endswith('.mp3')):
+            print('Please use a music player to open this file!')
+        elif (fileName.lower().endswith('.cpp')):
+            print('Please use a code editor to open this file!')
+        elif (fileName.lower().endswith('.c')):
+            print('Please use a code editor to open this file!')
+        elif (fileName.lower().endswith('.java')):
+            print('Please use a code editor to open this file!')
+        else
+            
+            
 # offset = self.BPB.MFT_start_sector * self.BPB.sector_per_cluster * self.BPB.byte_per_sector
+    
+    def readFile(self):
+        tmpMap = {}
+        allDir = self.getDir()
+        print('Files in', self.curNode, ':')
+        for child in allDir:
+            if not (child.entry.isFolder):
+                i = i + 1
+                print(str(i) + ':\t/', end = '')
+                print(child)
+                tmpMap[i] = child
+        print('Select file to print: ', end = '')
+        index = int(input())
+        if (index <= 0 or index > i):
+            print('Invalid index!')
+            return
+        self.printFile(tmpMap[index])
         
 driveLetter = 'G'
 my_NTFS = NTFS(driveLetter)
-my_NTFS.get_info()
-my_NTFS.readEntry()
 my_NTFS.getDirTree()
+my_NTFS.listDir()
+my_NTFS.moveIntoDir()
 # print(convertToTime(130381390209053668))
