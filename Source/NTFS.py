@@ -19,7 +19,8 @@ class Attribute(Flag):
     STANDARD_INFORMATION = 16
     FILE_NAME = 48
     DATA = 128
-        
+
+#read volume basic infomation        
 class BPB:
     def __init__(self, ptr, name):
         self.name = name
@@ -46,9 +47,9 @@ class BPB:
         
 #     def __str__(self):
 #         return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
-    
+#store MFT Entrys info
 class Entry:
-    def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False, fileContent = None):
+    def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False, fileContent = None, fileSize = 0):
         self.isFolder = isFolder
         self.name = name
         self.timeCreated = timeCreated
@@ -56,7 +57,9 @@ class Entry:
         self.timeModified = timeModified
         self.parDir = parDirectory
         self.fileContent = fileContent
+        self.fileSize = fileSize
 
+#nodes of the directory tree
 class Node:
     def __init__(self, entry = None, parent = None, address = None):
         self.entry = entry
@@ -67,6 +70,7 @@ class Node:
     def __str__(self):
         return self.entry.name
 
+#main class
 class NTFS:
     def __init__(self, name):
         self.name = name
@@ -78,12 +82,16 @@ class NTFS:
             self.BPB = BPB(self.ptr, self.name + ':')
         self.readEntry()
     
-    def get_info(self):
-        print('sector_size: ', self.BPB.byte_per_sector)
-        print('sector_per_cluster: ', self.BPB.sector_per_cluster)
-        print('sector per track: ', self.BPB.sector_per_track)
-        print('number_of_sector: ', self.BPB.number_of_sector)
+    #get basic infomation of the volume
+    def getVolumeInfo(self):
+        print('Volume name: ', self.name + ':')
+        print('Sector size: ', self.BPB.byte_per_sector)
+        print('Sectors per cluster: ', self.BPB.sector_per_cluster)
+        print('Sectors per track: ', self.BPB.sector_per_track)
+        print('Number of sector: ', self.BPB.number_of_sector)
+        print('MFT start sector: ', self.BPB.MFT_start_sector)
 
+    #convert cluster to sector list
     def clusterToSectorList(self, clusterList):
         sectorList = [] 
         for cluster in clusterList:
@@ -214,7 +222,7 @@ class NTFS:
             curEntry = None
             if (fileName.startswith('$')):
                 continue
-            curEntry = Entry(int(parDir, 16), fileName, createTime, accessedTime, modifiedTime, isFolder, fileContent)
+            curEntry = Entry(int(parDir, 16), fileName, createTime, accessedTime, modifiedTime, isFolder, fileContent, fileSize)
             
             # Read .txt file
             # if (fileName.lower().endswith('.txt')): 
@@ -230,19 +238,20 @@ class NTFS:
                 self.root = val
                 self.curNode = self.root
 
-    
-    def getDirTree(self, curNode = None, depth = 0):
+    #supportive functions in building directory tree
+    def drawDirTree(self, curNode = None, depth = 0):
         if (curNode == None):
             print(self.name + ':')
             curNode = self.root
         for child in curNode.children:
             if (child == curNode):
                 continue
-            for i in range(depth + 1):
-                print('--', end = '')
+            print('├─', end = '' )
+            for i in range(depth):
+                print('──', end = '')
             print(child.entry.name)
             if (child.entry.isFolder):
-                self.getDirTree(curNode = child, depth = depth + 1)
+                self.drawDirTree(curNode = child, depth = depth + 1)
     
     def getDir(self):
         allDir = []
@@ -254,15 +263,35 @@ class NTFS:
         return allDir
 
     def listDir(self):
-        print('Objects in', self.curNode, ':')
         allDir = self.getDir()
+        i = 0
+        # format column
+        print(f'{"Index":<8} | {"Type":<14} | {"Date - Time":<25} | {"Size(B)":<9} | {"Name":<30}')
+        print('-' * (8+14+25+9+30))
         for child in allDir:
+            if (child == None):
+                continue
             if (child == self.curNode.parent):
-                print('\t/..')
+                if (child == self.root):
+                    continue
+                i = i + 1
+                # print(str(i) + '.   directory\t/..')
+                print(f'{str(i):<8} | {"directory":<14} | {str(child.entry.timeCreated).strip():<25} | {"":<9} | {"/..":<30}')
                 continue
             if (child.entry.isFolder):
-                print('\t/', end = '')
-            print(child)
+                i = i + 1
+                # print(str(i) + '.   directory\t/', end = '')
+                # print(child)
+                print(f'{str(i):<8} | {"directory":<14} | {str(child.entry.timeCreated).strip():<25} | {"":<9} | {str("/" + child.entry.name.strip()):<30}')
+        for child in allDir:
+            if (child == self.curNode.parent or child == None):
+                continue
+            if not (child.entry.isFolder):
+                i = i + 1
+                # print(str(i) + '.   archive  \t', end = '')
+                # print(child)
+                print(f'{str(i):<8} | {"archive":<14} | {str(child.entry.timeCreated).strip():<25} | {str(child.entry.fileSize):<9} | {str(child.entry.name.strip()):<30}')
+    
     
     def moveIntoDir(self):
         print('Folders in', self.curNode, ':')
@@ -321,7 +350,6 @@ class NTFS:
             
             
 # offset = self.BPB.MFT_start_sector * self.BPB.sector_per_cluster * self.BPB.byte_per_sector
-    
     def readFile(self):
         tmpMap = {}
         allDir = self.getDir()
@@ -333,17 +361,57 @@ class NTFS:
                 print(str(i) + ':\t', end = '')
                 print(child)
                 tmpMap[i] = child
+        if (i == 0):
+            print('No files in current working directory!')
+            return
         print('Select file to print: ', end = '')
         index = int(input())
         if (index <= 0 or index > i):
             print('Invalid index!')
             return
         self.printFile(tmpMap[index])
-        
-driveLetter = 'G'
-my_NTFS = NTFS(driveLetter)
-my_NTFS.getDirTree()
-my_NTFS.listDir()
-my_NTFS.moveIntoDir()
-my_NTFS.readFile()
-# print(convertToTime(130381390209053668))
+
+    def dfs(self, dirList, curNode = None, index = 1):
+        if (curNode == None):
+            curNode = self.root
+        if (index >= len(dirList)):
+            return False
+        curObjName = dirList[index].lower()
+        for obj in curNode.children:
+            if (obj.entry.name.lower().strip() == curObjName):
+                if not (obj.entry.isFolder):
+                    if (index == len(dirList) - 1):
+                        return obj
+                    else:
+                        return False
+                elif (obj.entry.isFolder):
+                    if (index == len(dirList) - 1):
+                        # print('is curnode', curNode.dir, ' ', curNode.name, ' ', curNode.isRoot)
+                        self.curNode = obj
+                        return True
+                    return self.dfs(dirList, obj, index + 1)
+        return False
+    
+    def followDir(self, dir):
+        dir = dir.replace('\\', '/')
+        dirList = dir.split('/')
+        val = self.dfs(dirList)
+        return val
+
+    def printFileFromDir(self, dir):
+        val = self.followDir(dir)
+        if (val == False or val == True):
+            print('Invalid directory!')
+        else:
+            print('found')
+            self.printFile(val)
+    
+    def gotoDir(self, dir):
+        val = self.followDir(dir)
+        if (val == False):
+            print('Invalid directory!')
+        else:
+            print('Current working directory: ', dir)
+    
+    def drawTree(self):
+        self.drawDirTree(curNode = self.curNode)
