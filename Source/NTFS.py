@@ -34,20 +34,6 @@ class BPB:
         self.MFT_start_sector = self.sector_per_cluster * int.from_bytes(self.data[0x30:0x38], byteorder='little')
         self.MFT_reserve_start_sector = self.sector_per_cluster * int.from_bytes(self.data[0x38:0x40], byteorder='little')
 
-# class FileDir:
-#     def __init__(self, name, size, createTime, modifiedTime, accessedTime, fileContent, filePermission, isFolder):
-#         self.name = name
-#         self.size = size
-#         self.createTime = createTime
-#         self.modifiedTime = modifiedTime
-#         self.accessedTime = accessedTime
-#         self.fileContent = fileContent
-#         self.filePermission = filePermission
-#         self.isFolder = isFolder
-        
-#     def __str__(self):
-#         return f'name: {self.name}, size: {self.size}, createTime: {self.createTime}, modifiedTime: {self.modifiedTime}, accessedTime: {self.accessedTime}, fileContent: {self.fileContent}, filePermission: {self.filePermission}, isFolder: {self.isFolder}'
-#store MFT Entrys info
 class Entry:
     def __init__(self, parDirectory, name = None, timeCreated = None, timeAccessed = None, timeModified = None, isFolder = False, fileContent = None, fileSize = 0):
         self.isFolder = isFolder
@@ -407,6 +393,16 @@ class NTFS:
             self.printFile(val)
     
     def gotoDir(self, dir):
+        dir = dir.replace('\\', '/')
+        dirList = dir.split('/')
+        if (len(dirList) == 1):
+            if (dirList[0] == self.name + ':'):
+                self.curNode = self.root
+                print('Current working directory: ', self.name + ':')
+                return
+            else:
+                print('Invalid directory!')
+                return
         val = self.followDir(dir)
         if (val == False):
             print('Invalid directory!')

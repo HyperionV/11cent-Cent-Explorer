@@ -75,8 +75,10 @@ if __name__ == "__main__":
     disk = None
     if (fileSystem.strip() == 'FAT32'):
         disk = FAT32(driveLetter)
+        print(driveLetter, 'uses FAT32 file system.')
     elif (fileSystem.strip() == 'NTFS'):
         disk = NTFS(driveLetter)
+        print(driveLetter, 'uses NTFS file system.')
     else:
         print("Unsupported file system!")
         exit()

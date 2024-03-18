@@ -237,14 +237,14 @@ class FAT32:
         self.ptr = open(f'\\\\.\\{self.name}:', 'rb')
         self.fat = FAT(read_sector(self.ptr, self.boot_sector.reserved_sectors, self.boot_sector.fat_size * self.boot_sector.fat_count, self.boot_sector.bytes_per_sector))
         self.RDET = RDET(self.ptr, self.boot_sector.RDET_start * self.boot_sector.bytes_per_sector, self.boot_sector.bytes_per_sector)
-        self.root = Node(entry = None, isRoot = True)
+        self.root = Node(dir = self.name + ':', entry = None, isRoot = True)
         self.curNode = self.root
         self.get_dir_tree()
 #       data_a = read_chain(cu, 5, boot_sector.sectors_per_cluster, boot_sector.bytes_per_sector, fat, boot_sector.RDET_start)
 #       SDET_a = SDET(data_a)
         
     def getVolumeInfo(self):
-        print('Volume name: ', self.name + 'F')
+        print('Volume name: ', self.name + ':')
         print('OEM_Name: ', self.boot_sector.oem_name.decode())
         print('Bytes per sector: ', self.boot_sector.bytes_per_sector)
         print('Sectors per cluster: ', self.boot_sector.sectors_per_cluster)
@@ -350,10 +350,10 @@ class FAT32:
             print('Please use an appropriate program to open this file!')
     
     def get_dir_tree(self):
-        self.root = Node(entry = None, isRoot = True)
+        self.root = Node(dir = self.name + ':', entry = None, isRoot = True)
         self.vis(0, f'\\\\.\\{self.name}:')
         self.curNode = self.root
-    # └ ?
+        
     def draw_dir_tree(self, curNode, depth = 0):
         if (curNode.isRoot):
             print(self.name + ':')
@@ -495,6 +495,16 @@ class FAT32:
             self.printFile(val)
     
     def gotoDir(self, dir):
+        dir = dir.replace('\\', '/')
+        dirList = dir.split('/')
+        if (len(dirList) == 1):
+            if (dirList[0] == self.name + ':'):
+                self.curNode = self.root
+                print('Current working directory: ', self.curNode.dir.strip('\\\\.\\'))
+                return
+            else:
+                print('Invalid directory!')
+                return
         val = self.followDir(dir)
         if (val == False):
             print('Invalid directory!')
